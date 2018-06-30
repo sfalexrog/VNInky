@@ -37,6 +37,15 @@ public class GameState : MonoBehaviour
 		if (_story.canContinue)
 		{
 			OutputText.text = _story.Continue();
+			if (_story.currentTags.Count > 0)
+			{
+				OutputText.text += "\nCurrent tags:";
+				foreach (var tag in _story.currentTags)
+				{
+					OutputText.text += $"\n{tag}";
+				}
+			}
+			
 			if (_story.currentChoices.Count > 0)
 			{
 				foreach (var choice in _story.currentChoices)
