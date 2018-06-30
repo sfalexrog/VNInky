@@ -16,22 +16,19 @@ public class GameState : MonoBehaviour
 
 	private Story _story;
 
-	void Awake()
+	void Start()
 	{
 		_story = new Story(StoryJson.text);
 		ProceedButton.onClick.AddListener(delegate { OnProceed(); });
-
-		_story.variablesState["gender"] = 0;
 		
-		Debug.Log("Avaliable variables: ");
-		foreach (var variable in _story.variablesState)
-		{
-			Debug.Log($"{variable} : {_story.variablesState[variable]}");
-		}
-		_story.ChoosePathString("start");
-		
+		_story.BindExternalFunction("gender", () => GetGender());
 		
 		OnProceed();
+	}
+
+	private static int GetGender()
+	{
+		return 0; // Boy
 	}
 
 
@@ -55,13 +52,6 @@ public class GameState : MonoBehaviour
 		{
 			OutputText.text = "End of story";
 		}
-	}
-	
-
-	// Use this for initialization
-	void Start () {
-		_story = new Story(StoryJson.text);
-		
 	}
 	
 	// Update is called once per frame
