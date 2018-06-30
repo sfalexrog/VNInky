@@ -285,7 +285,21 @@ namespace Ink.UnityIntegration {
 		}
 
 		private static void ProcessError (Process process, string message) {
-			message = message.Trim();
+			if (message != null)
+			{
+				message = message.Trim();	
+			}
+			else
+			{
+				Debug.LogWarning("[Ink compiler process] Got spurious null error message, ignoring");
+				return;
+			}
+			// Byte-order mark seems to confuse the living hell out of the library
+			if (message == "" || message[0] == (char)65279)
+			{
+				Debug.LogWarning("[Ink compiler process] Got empty error message, ignoring");
+				return;
+			}
 			if (InkEditorUtils.IsNullOrWhiteSpace(message) || message == "???")
 				return;
 			Debug.Log(message[0]);
