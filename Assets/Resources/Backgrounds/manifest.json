@@ -1,0 +1,46 @@
+[
+  {
+    "name": "Школа",
+    "image": "Backgrounds/BackgroundImages/1"
+  },
+  {
+    "name": "Замок",
+    "image": "Backgrounds/BackgroundImages/2"
+  },
+  {
+    "name": "Усадьба",
+    "image": "Backgrounds/BackgroundImages/5"
+  },
+  {
+    "name": "Лес",
+    "image": "Backgrounds/BackgroundImages/3"
+  },
+  {
+    "name": "Руины",
+    "image": "Backgrounds/BackgroundImages/4"
+  },
+  {
+    "name": "Комната м",
+    "image": "Backgrounds/BackgroundImages/room_boy"
+  },
+  {
+    "name": "Комната д",
+    "image": "Backgrounds/BackgroundImages/room_girl"
+  },
+  {
+    "name": "Кухня",
+    "image": "Backgrounds/BackgroundImages/kitchen"
+  },
+  {
+    "name": "Подъезд",
+    "image": "Backgrounds/BackgroundImages/entrance"
+  },
+  {
+    "name": "Телефон",
+    "image": "Backgrounds/BackgroundImages/phone"
+  },
+  {
+    "name": "Синий",
+    "image": "Backgrounds/BackgroundImages/dark_blue"
+  }
+]

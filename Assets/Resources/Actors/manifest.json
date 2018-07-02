@@ -1,0 +1,91 @@
+[
+  {
+    "name": "Алиса",
+    "emotions":
+    {
+      "default": "Actors/ActorImages/1"
+    }
+  },
+  {
+    "name": "Максим",
+    "emotions":
+    {
+      "default": "Actors/ActorImages/2"
+    }
+  },
+  {
+    "name": "Эрик",
+    "emotions":
+    {
+      "default": "Actors/ActorImages/3"
+    }
+  },
+  {
+    "name": "Костя",
+    "emotions":
+    {
+      "default": "Actors/ActorImages/4"
+    }
+  },
+  {
+    "name": "Мама",
+    "emotions":
+    {
+      "default": "Actors/ActorImages/mother"
+    }
+  },
+  {
+    "name": "Я",
+    "emotions":
+    {
+      "default": "Actors/ActorImages/hero_boy"
+    }
+  },
+  {
+    "name": "Player Boy",
+    "emotions":
+    {
+      "default": "Actors/ActorImages/hero_boy"
+    }
+  },{
+    "name": "Player Girl",
+    "emotions":
+    {
+      "default": "Actors/ActorImages/hero_girl"
+    }
+  },{
+    "name": "Неизвестный",
+    "emotions":
+    {
+      "default": "Actors/ActorImages/silhouette"
+    }
+  }
+  ,{
+    "name": "Учитель",
+    "emotions":
+    {
+      "default": "Actors/ActorImages/teacher"
+    }
+  }
+  ,{
+    "name": "Саша",
+    "emotions":
+    {
+      "default": "Actors/ActorImages/leader"
+    }
+  }
+  ,{
+    "name": "Вася",
+    "emotions":
+    {
+      "default": "Actors/ActorImages/coder"
+    }
+  },
+  {
+    "name": "Робот",
+    "emotions":
+    {
+      "default": "Actors/ActorImages/bamblebee"
+    }
+  }
+]
