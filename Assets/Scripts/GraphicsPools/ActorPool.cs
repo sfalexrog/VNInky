@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using Newtonsoft.Json;
 using UnityEngine;
 
@@ -77,7 +78,7 @@ namespace GraphicsPools
             if (!actor.emotions.TryGetValue(actorEmotion, out actorResource))
             {
                 Debug.LogWarning($"{_tag} Emotion {actorEmotion} is not in descriptor for {actorName}, substituting default emotion instead");
-                if (!actor.emotions.TryGetValue("default", out actorEmotion))
+                if (!actor.emotions.TryGetValue("default", out actorResource))
                 {
                     Debug.LogError($"{_tag} Default emotion is not in descriptor for {actorName}, bailing out");
                     return null;
@@ -91,6 +92,12 @@ namespace GraphicsPools
             }
 
             return actorSprite;
+        }
+        
+        public HashSet<string> GetActorNames()
+        {
+            return new HashSet<string>(_actors.Keys.ToList());
+
         }
     }
 }
