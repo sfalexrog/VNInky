@@ -80,6 +80,18 @@ public class StoryPlayer : MonoBehaviour
 			if (splitPhrase[0].Equals(_playerActorName))
 			{
 				parsedPhrase.ActorName = GetGender() == 0 ? _playerBoyName : _playerGirlName;
+				StringBuilder sb = new StringBuilder();
+
+				for (int i = 1; i < splitPhrase.Length; ++i)
+				{
+					sb.Append(splitPhrase[i]);
+					if (i < splitPhrase.Length - 1)
+					{
+						sb.Append(": ");
+					}
+				}
+
+				parsedPhrase.Text = sb.ToString();
 			}
 			else if (_registeredActors.Contains(splitPhrase[0]))
 			{

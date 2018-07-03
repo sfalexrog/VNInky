@@ -111,7 +111,9 @@ public class StoryUIController : MonoBehaviour {
 			TimeStart = timeStart;
 			TimeEnd = timeStart + duration;
 			Curve = curve;
-			InitialAlpha = target.color.a;
+			//InitialAlpha = target.color.a;
+			// hack: initial alpha is always 1-targetAlpha
+			InitialAlpha = 1.0f - targetAlpha;
 			TargetAlpha = targetAlpha;
 			TargetText = targetText;
 			DidFinish = TimeEnd < TimeStart;
