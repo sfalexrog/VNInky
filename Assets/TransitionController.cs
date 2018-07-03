@@ -9,12 +9,65 @@ public class TransitionController : MonoBehaviour
 	public Image TransformingImage;
 	public Image[] Anchors;
 
+	public Text TransformingText;
+
 	public AnimationCurve TransitionCurve;
 	public float TransitionDuration;
 
 	private int _currentAnchor;
 
-	private class PendingAnimation
+	private class AnimGroup
+	{
+		public List<RectAnimation> RectAnims;
+		public List<TextAnimation> TextAnims;
+
+		public float TimeStart;
+		public float TimeEnd;
+
+		public AnimGroup()
+		{
+			RectAnims = new List<RectAnimation>();
+			TextAnims = new List<TextAnimation>();
+
+			TimeStart = TimeEnd = Time.time;
+		}
+
+		public AnimGroup AddAnimation(RectAnimation ra)
+		{
+			TimeStart = Mathf.Min(TimeStart, ra.TimeStart);
+			TimeEnd = Mathf.Max(TimeEnd, ra.TimeEnd);
+			RectAnims.Add(ra);
+			return this;
+		}
+
+		public AnimGroup AddAnimation(TextAnimation ta)
+		{
+			TimeStart = Mathf.Min(TimeStart, ta.TimeStart);
+			TimeEnd = Mathf.Max(TimeEnd, ta.TimeEnd);
+			TextAnims.Add(ta);
+			return this;
+		}
+	}
+
+	private class TextAnimation
+	{
+		public float TimeStart;
+		public float TimeEnd;
+
+		public TextAnimation(float duration, float start, float initialOpactiy, float targetOpacity)
+		{
+			TimeStart = start;
+			TimeEnd = TimeStart + duration;
+			InitialOpacity = initialOpactiy;
+			TargetOpacity = targetOpacity;
+		}
+
+		public float InitialOpacity;
+		public float TargetOpacity;
+
+	}
+
+	private class RectAnimation
 	{
 		public float TimeStart;
 		public float TimeEnd;
@@ -25,50 +78,76 @@ public class TransitionController : MonoBehaviour
 		public Vector2 InitialSize;
 		public Vector2 TargetSize;
 
+		public RectAnimation(float duration, float start, RectTransform initial, RectTransform target)
+		{
+			TimeStart = start;
+			TimeEnd = start + duration;
+			InitialPosition = initial.anchoredPosition;
+			TargetPosition = target.anchoredPosition;
 
+			InitialSize = new Vector2(initial.rect.width, initial.rect.height);
+			TargetSize = new Vector2(target.rect.width, target.rect.height);
+		}
 	}
 
-	private PendingAnimation _animation;
+	private Queue<AnimGroup> _animQueue;
 
 	public void OnRunAnimation()
 	{
 		var target = Anchors[_currentAnchor];
 		_currentAnchor = (_currentAnchor + 1) % Anchors.Length;
 		
-		_animation = new PendingAnimation();
-		_animation.TimeStart = Time.time;
-		_animation.TimeEnd = _animation.TimeStart + TransitionDuration;
-		_animation.InitialPosition = TransformingImage.rectTransform.anchoredPosition;
-		_animation.TargetPosition = target.rectTransform.anchoredPosition;
-
-		var initialRect = TransformingImage.rectTransform.rect;
-		_animation.InitialSize = new Vector2(initialRect.width, initialRect.height);
-		var targetRect = target.rectTransform.rect;
-		_animation.TargetSize = new Vector2(targetRect.width, targetRect.height);
+		var animGroup = new AnimGroup();
+		animGroup.AddAnimation(new TextAnimation(0.3f, Time.time, 1.0f, 0.0f))
+			.AddAnimation(new RectAnimation(0.5f, Time.time + 0.3f, TransformingImage.rectTransform,
+				target.rectTransform))
+			.AddAnimation(new TextAnimation(0.3f, Time.time + 0.8f, 0.0f, 1.0f));
+		
+		
+		_animQueue.Enqueue(animGroup);
 	}
 	
 	// Use this for initialization
 	void Start ()
 	{
 		_currentAnchor = 0;
-		_animation = null;
+		_animQueue = new Queue<AnimGroup>();
 	}
 	
 	// Update is called once per frame
 	void Update () {
-		if (_animation != null)
+		if (_animQueue.Count > 0)
 		{
-			var dt = (Time.time - _animation.TimeStart) / (_animation.TimeEnd - _animation.TimeStart);
-			var c = TransitionCurve.Evaluate(dt);
-			var transitionPosition = c * _animation.TargetPosition + (1 - c) * _animation.InitialPosition;
-			var transitionSize = c * _animation.TargetSize + (1 - c) * _animation.InitialSize;
-			TransformingImage.rectTransform.anchoredPosition = transitionPosition;
-			TransformingImage.rectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, transitionSize.x);
-			TransformingImage.rectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, transitionSize.y);
-			
+			var currentAnim = _animQueue.Peek();
+			var t = Time.time;
+			foreach (var textAnim in currentAnim.TextAnims)
+			{
+				if (textAnim.TimeStart > t) continue;
+				if (textAnim.TimeEnd < t) continue;
+				var dt = (t - textAnim.TimeStart) / (textAnim.TimeEnd - textAnim.TimeStart);
+				var c = TransitionCurve.Evaluate(dt);
+				var currentColor = TransformingText.color;
+				currentColor.a = (1 - c) * textAnim.InitialOpacity + c * textAnim.TargetOpacity;
+				TransformingText.color = currentColor;
+			}
 
+			foreach (var rectAnim in currentAnim.RectAnims)
+			{
+				if ((rectAnim.TimeStart > t) || (rectAnim.TimeEnd < t)) continue;
+				var dt = (t - rectAnim.TimeStart) / (rectAnim.TimeEnd - rectAnim.TimeStart);
+				var c = TransitionCurve.Evaluate(dt);
+				var transitionPosition = c * rectAnim.TargetPosition + (1 - c) * rectAnim.InitialPosition;
+				var transitionSize = c * rectAnim.TargetSize + (1 - c) * rectAnim.InitialSize;
+				TransformingImage.rectTransform.anchoredPosition = transitionPosition;
+				TransformingImage.rectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, transitionSize.x);
+				TransformingImage.rectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, transitionSize.y);
+				
+			}
 
-			if (Time.time > _animation.TimeEnd) _animation = null;
+			if (currentAnim.TimeEnd < t)
+			{
+				_animQueue.Dequeue();
+			}
 		}
 	}
 }
