@@ -8,8 +8,8 @@ using GraphicsPools;
 using Ink.Runtime;
 using InkleVN;
 using UnityEngine;
-using UnityEngine.iOS;
 using UnityEngine.UI;
+using UnityEngine.Assertions;
 
 public class StoryPlayer : MonoBehaviour
 {
@@ -40,6 +40,9 @@ public class StoryPlayer : MonoBehaviour
 		ProceedButton.onClick.AddListener(delegate { OnProceed(); });
 		
 		_story.BindExternalFunction("gender", () => GetGender());
+        // Bind variable changes
+        _story.ObserveVariable("didCompleteChapter", OnDidCompleteChapterChange);
+
 		UI.SetOnChoiceHandler(OnChoice);
 		/*
 		Debug.Log(LayoutUtility.GetPreferredHeight(OutputText.rectTransform));
@@ -55,6 +58,15 @@ public class StoryPlayer : MonoBehaviour
 		OnProceed();
 	}
 	
+    private void OnDidCompleteChapterChange(string variableName, object newValue)
+    {
+        // TODO: integrate with our original codebase
+        Assert.AreEqual(variableName, "didCompleteChapter", $"Unexpected variable name {variableName} in didCompleteChapter observer!");
+        // Due to some peculiarities of the Ink engine, boolean values are actually passed to us as ints
+        Assert.IsTrue(newValue.GetType() == typeof(int), $"Incorrect type for didCompleteChapter (expected System.Int32, got {newValue.GetType()})");
+        int didCompleteChapter = (int)newValue;
+        Debug.Log($"[StoryPlayer] didCompleteChapter set to {didCompleteChapter}");
+    }
 	
 	// FIXME: pull this value from the proper game state
 	private static int GetGender()

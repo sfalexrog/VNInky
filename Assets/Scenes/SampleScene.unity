@@ -1455,7 +1455,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   StoryJson: {fileID: 4900000, guid: ccd99e262471f4d8c9ee0cbe57694752, type: 3}
   OutputText: {fileID: 0}
-  OutputBackground: {fileID: 1823656333}
+  OutputBackground: {fileID: 0}
   ProceedButton: {fileID: 436037097}
   UI: {fileID: 1445854609}
 --- !u!4 &2047073495
