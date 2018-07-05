@@ -14,6 +14,21 @@ using UnityEngine.Assertions;
 public class StoryPlayer : MonoBehaviour
 {
 
+    public class StoryChoice
+    {
+        public int ChoiceID; // Choice ID, as presented by Inkle
+        public string ChoiceText;
+        public string ChoiceType; // Good, neutral, or bad
+
+        public StoryChoice(int choiceId, string choiceText, string choiceType)
+        {
+            ChoiceID = choiceId;
+            ChoiceText = choiceText;
+            ChoiceType = choiceType;
+        }
+    }
+
+
 	public TextAsset StoryJson;
 
 	public Text OutputText;
@@ -159,42 +174,129 @@ public class StoryPlayer : MonoBehaviour
 		OnProceed();
 	}
 
+    private string RebuildString(string[] splitString, int offset)
+    {
+        StringBuilder sb = new StringBuilder();
+        for(int i = 0; i < splitString.Length; ++i)
+        {
+            sb.Append(splitString[i]);
+            if (i < splitString.Length - 1)
+            {
+                sb.Append(":");
+            }
+        }
+        return sb.ToString();
+    }
+
+    /**
+     * Create a scene transition, based on the current state
+     */
+    private SceneTransitionRequest CreateSceneTransition(SceneTransitionRequest prevRequest = null)
+    {
+        if (!_story.canContinue) return null;
+        var transitionBuilder = new SceneTransitionRequest.Builder();
+        if (prevRequest != null)
+        {
+            // Copy fileds from the previous transition
+            // FIXME: right now we actually only care about background changes...
+            transitionBuilder.SetBackground(prevRequest.TransitionBackground);
+        }
+        var storyText = _story.currentText;
+        var storyTags = _story.currentTags;
+        // Parse tags first, they will come in handy later
+        var actorEmotion = "default";
+        var canUseDefender = false;
+        var defenderCost = 0;
+        foreach(var tag in storyTags)
+        {
+            var tagComponents = tag.Split(':');
+            if (tagComponents.Length > 1)
+            {
+                if (tagComponents[0].Equals("defenderAvailable"))
+                {
+                    canUseDefender = tagComponents[1].Trim().Equals("true");
+                }
+                else if (tagComponents[0].Equals("defenderCost"))
+                {
+                    defenderCost = int.Parse(tagComponents[1]);
+                }
+            }
+            else
+            {
+                // Keyless tags are interpreted as emotions
+                actorEmotion = tag;
+            }
+        }
+
+
+        // Parse story text, possibly handling edge cases like location changes
+        var splitText = storyText.Split(':');
+        if (splitText.Length > 1)
+        {
+            if (splitText[0].Equals("Location"))
+            {
+                // Location change. We should probably read the next line and re-run our function.
+                transitionBuilder.SetBackground(splitText[1].Trim());
+                _story.Continue();
+                return CreateSceneTransition(transitionBuilder.Build());
+            }
+            else
+            {
+                if (splitText[0].Equals(_playerActorName))
+                {
+                    var speaker = GetGender() == 0 ? _playerBoyName : _playerGirlName;
+                    transitionBuilder.SetSpeaker(speaker, actorEmotion);
+                    transitionBuilder.SetPhrase(RebuildString(splitText, 1));
+                }
+                else if (_registeredActors.Contains(splitText[0]))
+                {
+                    var speaker = splitText[0];
+                    transitionBuilder.SetSpeaker(speaker, actorEmotion);
+                    transitionBuilder.SetPhrase(RebuildString(splitText, 1));
+                }
+                else
+                {
+                    // No one is actually speaking, the colon is just part of the text
+                    transitionBuilder.SetPhrase(storyText);
+                }
+            }
+        }
+        else
+        {
+            // Set text only
+            transitionBuilder.SetPhrase(storyText);
+        }
+
+        // Parse choices (if there are any)
+        foreach (var choice in _story.currentChoices)
+        {
+            var splitChoice = choice.text.Split('@');
+            var choiceType = "neutral";
+            if (splitChoice.Length > 1)
+            {
+                choiceType = splitChoice[1];
+            }
+            var storyChoice = new StoryChoice(choice.index, splitChoice[0], choiceType);
+            transitionBuilder.AddChoice(storyChoice);
+        }
+
+        return transitionBuilder.Build();
+    }
+
 	public void OnProceed()
 	{
 		if (!UI.WillAcceptTransitions) return;
-		var transitionBuilder = new SceneTransitionRequest.Builder();
 		if (_story.canContinue)
 		{
 			var nextStoryText = _story.Continue();
+            var transition = CreateSceneTransition();
 			var parsedText = ParsePhrase(nextStoryText, _story.currentTags);
-
-			transitionBuilder.SetSpeaker(parsedText.ActorName)
-				.SetPhrase(parsedText.Text)
-				.SetSpeaker(parsedText.ActorName, parsedText.ActorEmotion);
-			
-			if (_story.currentTags.Count > 0)
-			{
-				Debug.Log("Current tags:");
-				foreach (var tag in _story.currentTags)
-				{
-					Debug.Log($"\n{tag}");
-				}
-			}
-			
-			if (_story.currentChoices.Count > 0)
-			{
-				foreach (var choice in _story.currentChoices)
-				{
-					Debug.Log($"\nChoice {choice.index}: {choice.text}");
-					transitionBuilder.AddChoice(choice.text);
-				}
-			}
+            UI.Transition(transition);
 		}
 		else
 		{
 			// finish?
 		}
-		UI.Transition(transitionBuilder.Build());
 	}
 	
 	// Update is called once per frame

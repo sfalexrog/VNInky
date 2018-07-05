@@ -16,7 +16,7 @@ namespace InkleVN
 
         public string TransitionPhrase { get; private set; }
         
-        public string[] TransitionChoices { get; private set; }
+        public StoryPlayer.StoryChoice[] TransitionChoices { get; private set; }
 
         private SceneTransitionRequest()
         {
@@ -27,7 +27,7 @@ namespace InkleVN
         {
             private SceneTransitionRequest _str;
 
-            private List<string> _choices;
+            private List<StoryPlayer.StoryChoice> _choices;
 
             public Builder()
             {
@@ -53,9 +53,9 @@ namespace InkleVN
                 return this;
             }
 
-            public Builder AddChoice(string choice)
+            public Builder AddChoice(StoryPlayer.StoryChoice choice)
             {
-                if (_choices == null) _choices = new List<string>();
+                if (_choices == null) _choices = new List<StoryPlayer.StoryChoice>();
                 _choices.Add(choice);
                 return this;
             }

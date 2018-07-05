@@ -7,174 +7,302 @@ using UnityEngine.Animations;
 using UnityEngine.UI;
 
 public class StoryUIController : MonoBehaviour {
-	
-	private ActorPool _actorPool;
-	private BackgroundPool _backgroundPool;
 
-	[Header("UI elements")]
-	public Image Background;
-	public Image BackgroundTransition;
-	public Image PhraseBackground;
-	public Text PhraseText;
-	public Image ActorNameBox;
-	public Text ActorName;
-	public Image ActorImage;
-	
+    private ActorPool _actorPool;
+    private BackgroundPool _backgroundPool;
 
-	public Button TapTarget;
+    [Header("UI elements")]
+    public Image Background;
+    public Image BackgroundTransition;
+    public Image PhraseBackground;
+    public Text PhraseText;
+    public Image ActorNameBox;
+    public Text ActorName;
+    public Image ActorImage;
 
-	[Header("Animation controls")]
-	public float FadeOutDuration;
-	public AnimationCurve FadeOutCurve;
-	
-	public float FadeInDuration;
-	public AnimationCurve FadeInCurve;
-	
-	public float TransitionDuration;
-	public AnimationCurve TransitionCurve;
 
-	[Header("Animation targets")]
-	public Image PlayerPhraseBackgroundAnchor;
+    public Button TapTarget;
 
-	public Image DescriptionBackgroundAnchor;
-	public Image NPCPhraseBackgroundAnchor;
-	
+    [Header("Animation controls")]
+    public float FadeOutDuration;
+    public AnimationCurve FadeOutCurve;
 
-	public delegate void OnChoice(int choiceIndex);
+    public float FadeInDuration;
+    public AnimationCurve FadeInCurve;
 
-	private OnChoice _choiceHandler;
+    public float TransitionDuration;
+    public AnimationCurve TransitionCurve;
 
-	public void SetOnChoiceHandler(OnChoice handler)
-	{
-		_choiceHandler = handler;
-	}
+    [Header("Animation targets")]
+    public Image PlayerPhraseBackgroundAnchor;
 
-	private bool _willAcceptTransitions;
+    public Image DescriptionBackgroundAnchor;
+    public Image NPCPhraseBackgroundAnchor;
 
-	public bool WillAcceptTransitions => _willAcceptTransitions;
+    public delegate void OnChoice(int choiceIndex);
 
-	// Animation for RectTransform
-	private class RectAnimation
-	{
-		public float TimeStart;
-		public float TimeEnd;
+    private OnChoice _choiceHandler;
 
-		public AnimationCurve Curve;
-		public RectTransform Target;
-		
-		public Vector2 InitialPosition;
-		public Vector2 TargetPosition;
+    private Text _shadowText;
 
-		public Vector2 InitialSize;
-		public Vector2 TargetSize;
+    public void SetOnChoiceHandler(OnChoice handler)
+    {
+        _choiceHandler = handler;
+    }
 
-		public bool DidFinish;
-		
-		public RectAnimation(RectTransform target, float timeStart, float duration, AnimationCurve curve,
-			RectTransform targetTransform)
-		{
-			Target = target;
-			TimeStart = timeStart;
-			TimeEnd = timeStart + duration;
-			Curve = curve;
-			InitialPosition = target.anchoredPosition;
-			TargetPosition = targetTransform.anchoredPosition;
-			InitialSize = new Vector2(target.rect.width, target.rect.height);
-			TargetSize = new Vector2(targetTransform.rect.width, targetTransform.rect.height);
-			DidFinish = TimeEnd < TimeStart;
+    private bool _willAcceptTransitions;
 
-		}
-	}
-	
-	// Animation for Text component (fade in/out)
-	private class TextAnimation
-	{
-		public float TimeStart;
-		public float TimeEnd;
+    public bool WillAcceptTransitions => _willAcceptTransitions;
 
-		public AnimationCurve Curve;
-		public Text Target;
+    // Animation for RectTransform
+    private class RectAnimation
+    {
+        public float TimeStart;
+        public float TimeEnd;
 
-		// Opacity values for text (since we're only doing that)
-		public float InitialAlpha;
-		public float TargetAlpha;
+        public AnimationCurve Curve;
+        public RectTransform Target;
 
-		public string TargetText;
+        public Vector2 InitialPosition;
+        public Vector2 TargetPosition;
 
-		public bool DidFinish;
+        public Vector2 InitialSize;
+        public Vector2 TargetSize;
 
-		// Convenience constructor
-		public TextAnimation(Text target, float timeStart, float duration, AnimationCurve curve,
-			float targetAlpha, string targetText = null)
-		{
-			Target = target;
-			TimeStart = timeStart;
-			TimeEnd = timeStart + duration;
-			Curve = curve;
-			//InitialAlpha = target.color.a;
-			// hack: initial alpha is always 1-targetAlpha
-			InitialAlpha = 1.0f - targetAlpha;
-			TargetAlpha = targetAlpha;
-			TargetText = targetText;
-			DidFinish = TimeEnd < TimeStart;
-		}
-		
-	}
+        public bool DidFinish;
 
-	// Animation group: animations that should be played simultaneously.
-	// Only one animation group will be played at a time.
-	private class AnimGroup
-	{
-		// Start and end times for animation group. They are populated automatically.
-		public float TimeStart;
-		public float TimeEnd;
-		
-		// Animation lists for the current group
-		public List<RectAnimation> RectAnimations;
-		public List<TextAnimation> TextAnimations;
+        public RectAnimation(RectTransform target, float timeStart, float duration, AnimationCurve curve,
+            RectTransform targetTransform)
+        {
+            Target = target;
+            TimeStart = timeStart;
+            TimeEnd = timeStart + duration;
+            Curve = curve;
+            InitialPosition = target.anchoredPosition;
+            TargetPosition = targetTransform.anchoredPosition;
+            InitialSize = new Vector2(target.rect.width, target.rect.height);
+            TargetSize = new Vector2(targetTransform.rect.width, targetTransform.rect.height);
+            DidFinish = TimeEnd < TimeStart;
 
-		public AnimGroup()
-		{
-			TimeEnd = TimeStart = Time.time;
-			RectAnimations = new List<RectAnimation>();
-			TextAnimations = new List<TextAnimation>();
-		}
+        }
+    }
 
-		public AnimGroup AddAnimation(RectAnimation ra)
-		{
-			TimeStart = Mathf.Min(TimeStart, ra.TimeStart);
-			TimeEnd = Mathf.Max(TimeEnd, ra.TimeEnd);
-			RectAnimations.Add(ra);
-			return this;
-		}
+    // Animation for Graphic-derivatives
+    private class FadeAnimation
+    {
+        public float TimeStart;
+        public float TimeEnd;
 
-		public AnimGroup AddAnimation(TextAnimation ta)
-		{
-			TimeStart = Mathf.Min(TimeStart, ta.TimeStart);
-			TimeEnd = Mathf.Max(TimeEnd, ta.TimeEnd);
-			TextAnimations.Add(ta);
-			return this;
-		}
-	}
+        public AnimationCurve Curve;
+        public Graphic Target;
 
-	private Queue<AnimGroup> _pendingAnimations;
-	
-	void Awake()
-	{
-		_willAcceptTransitions = true;
-		_actorPool = new ActorPool(false);
-		_backgroundPool = new BackgroundPool(false);
-		_pendingAnimations = new Queue<AnimGroup>();
-	}
+        // Opacity values for text (since we're only doing that)
+        public float InitialAlpha;
+        public float TargetAlpha;
 
-	/**
+        public bool DidFinish;
+
+        // Convenience constructor
+        public FadeAnimation(Graphic target, float timeStart, float duration, AnimationCurve curve,
+            float targetAlpha)
+        {
+            Target = target;
+            TimeStart = timeStart;
+            TimeEnd = timeStart + duration;
+            Curve = curve;
+            //InitialAlpha = target.color.a;
+            // hack: initial alpha is always 1-targetAlpha
+            InitialAlpha = 1.0f - targetAlpha;
+            TargetAlpha = targetAlpha;
+            DidFinish = TimeEnd < TimeStart;
+        }
+    }
+
+    // Pseudo-animation to set text
+    private class SetTextAnimation
+    {
+        // We do this momentarilly, so no duration here.
+        public float TimeSet;
+
+        public Text Target;
+        public string TargetText;
+
+        public bool DidFinish;
+
+        public SetTextAnimation(Text target, float timeSet, string targetText = null)
+        {
+            TimeSet = timeSet;
+            Target = target;
+            TargetText = targetText;
+            DidFinish = false;
+        }
+    }
+
+    // Pseudo-animation to set sprite
+    private class SetSpriteAnimation
+    {
+        public float TimeSet;
+
+        public Image Target;
+        public Sprite TargetSprite;
+
+        public bool DidFinish;
+
+        public SetSpriteAnimation(Image target, float timeSet, Sprite targetSprite)
+        {
+            TimeSet = timeSet;
+            Target = target;
+            TargetSprite = targetSprite;
+            DidFinish = false;
+        }
+    }
+
+
+    // Animation group: animations that should be played simultaneously.
+    // Only one animation group will be played at a time.
+    private class AnimGroup
+    {
+        // Start and end times for animation group. They are populated automatically.
+        public float TimeStart;
+        public float TimeEnd;
+
+        // Animation lists for the current group
+        public List<RectAnimation> RectAnimations;
+        public List<FadeAnimation> FadeAnimations;
+        public List<SetTextAnimation> SetTextAnimations;
+        public List<SetSpriteAnimation> SetSpriteAnimations;
+
+        public AnimGroup()
+        {
+            TimeEnd = TimeStart = Time.time;
+            RectAnimations = new List<RectAnimation>();
+            FadeAnimations = new List<FadeAnimation>();
+            SetTextAnimations = new List<SetTextAnimation>();
+            SetSpriteAnimations = new List<SetSpriteAnimation>();
+        }
+
+        public AnimGroup AddAnimation(RectAnimation ra)
+        {
+            TimeStart = Mathf.Min(TimeStart, ra.TimeStart);
+            TimeEnd = Mathf.Max(TimeEnd, ra.TimeEnd);
+            RectAnimations.Add(ra);
+            return this;
+        }
+
+        public AnimGroup AddAnimation(FadeAnimation ta)
+        {
+            TimeStart = Mathf.Min(TimeStart, ta.TimeStart);
+            TimeEnd = Mathf.Max(TimeEnd, ta.TimeEnd);
+            FadeAnimations.Add(ta);
+            return this;
+        }
+
+        public AnimGroup AddAnimation(SetTextAnimation sta)
+        {
+            TimeStart = Mathf.Min(TimeStart, sta.TimeSet);
+            TimeEnd = Mathf.Max(TimeEnd, sta.TimeSet);
+            SetTextAnimations.Add(sta);
+            return this;
+        }
+        
+        public AnimGroup AddAnimation(SetSpriteAnimation ssa)
+        {
+            TimeStart = Mathf.Min(TimeStart, ssa.TimeSet);
+            TimeEnd = Mathf.Max(TimeEnd, ssa.TimeSet);
+            SetSpriteAnimations.Add(ssa);
+            return this;
+        }
+    }
+
+    private Queue<AnimGroup> _pendingAnimations;
+
+    void Awake()
+    {
+        _willAcceptTransitions = true;
+        _actorPool = new ActorPool(false);
+        _backgroundPool = new BackgroundPool(false);
+        _pendingAnimations = new Queue<AnimGroup>();
+    }
+
+    /**
 	 * Get registered actor names. This is required to distinguish between
 	 * a "real" actor name and something that just happened to have a colon before it.
 	 */
-	public HashSet<string> GetActorNames()
-	{
-		return _actorPool.GetActorNames();
-	}
+    public HashSet<string> GetActorNames()
+    {
+        return _actorPool.GetActorNames();
+    }
+
+    private float GetDesiredTextWidth(Text textComponent, string textContents, Vector2 requestedSize)
+    {
+        if (_shadowText == null)
+        {
+            _shadowText = Instantiate<Text>(textComponent);
+            _shadowText.color = new Color(0, 0, 0, 0);
+        }
+        _shadowText.rectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, requestedSize.x);
+        _shadowText.rectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, requestedSize.y);
+
+        _shadowText.text = textContents;
+        return LayoutUtility.GetPreferredWidth(_shadowText.rectTransform);
+    }
+
+    private float GetDesiredTextHeight(Text textComponent, string textContents, Vector2 requestedSize)
+    {
+        if (_shadowText == null)
+        {
+            _shadowText = Instantiate<Text>(textComponent);
+            _shadowText.color = new Color(0, 0, 0, 0);
+        }
+        _shadowText.rectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, requestedSize.x);
+        _shadowText.rectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, requestedSize.y);
+
+        _shadowText.text = textContents;
+        return LayoutUtility.GetPreferredHeight(_shadowText.rectTransform);
+    }
+
+    private void TransitionBackground(SceneTransitionRequest str)
+    {
+        var animGroup = new AnimGroup();
+        BackgroundTransition.sprite = _backgroundPool.GetBackgroundSprite(str.TransitionBackground);
+        animGroup.AddAnimation(new FadeAnimation(BackgroundTransition, Time.time, FadeInDuration, FadeInCurve, 1.0f))
+            .AddAnimation(new SetSpriteAnimation(Background, Time.time + FadeInDuration, BackgroundTransition.sprite))
+            .AddAnimation(new FadeAnimation(BackgroundTransition, Time.time + FadeInDuration, 0.001f, FadeOutCurve, 0.0f));
+        _pendingAnimations.Enqueue(animGroup);
+    }
+
+    private void TransitionToDescription(SceneTransitionRequest str)
+    {
+        var animGroup = new AnimGroup();
+        var textFadeOut = new FadeAnimation(PhraseText, Time.time, FadeOutDuration, FadeOutCurve, 0.0f);
+        animGroup.AddAnimation(textFadeOut);
+
+        var lastAnimFinish = textFadeOut.TimeEnd;
+
+        var defaultTextBoxSize = new Vector2(DescriptionBackgroundAnchor.rectTransform.rect.width - 30,
+                                            DescriptionBackgroundAnchor.rectTransform.rect.height - 30);
+
+        var requiredHeight = GetDesiredTextHeight(PhraseText, str.TransitionPhrase, defaultTextBoxSize);
+
+        if (PhraseBackground.rectTransform.anchoredPosition != DescriptionBackgroundAnchor.rectTransform.anchoredPosition ||
+            requiredHeight != PhraseText.rectTransform.rect.height)
+        {
+            var textBoxResize = new RectAnimation(PhraseBackground.rectTransform, textFadeOut.TimeEnd, TransitionDuration, TransitionCurve, DescriptionBackgroundAnchor.rectTransform);
+            // Fixup for correct size
+            textBoxResize.TargetSize.y = requiredHeight + 30;
+            animGroup.AddAnimation(textBoxResize);
+            lastAnimFinish = textBoxResize.TimeEnd;
+        }
+
+        var textChange = new SetTextAnimation(PhraseText, lastAnimFinish, str.TransitionPhrase);
+        animGroup.AddAnimation(textChange);
+        var textFadeIn = new FadeAnimation(PhraseText, lastAnimFinish, FadeInDuration, FadeInCurve, 1.0f);
+        animGroup.AddAnimation(textFadeIn);
+        _pendingAnimations.Enqueue(animGroup);
+    }
+
+
+    
 	
 	/**
 	 * Transition scene to another state
@@ -182,22 +310,13 @@ public class StoryUIController : MonoBehaviour {
 	public bool Transition(SceneTransitionRequest str)
 	{
 		if (!_willAcceptTransitions) return false;
-		// Empty speaker - transition to description phrase or background
-		if (str.TransitionSpeaker == null)
+        if (str.TransitionBackground != null)
+        {
+            TransitionBackground(str);
+        }
+        if (str.TransitionSpeaker == null)
 		{
-			if (str.TransitionBackground != null)
-			{
-				// TODO: animate background transition
-				Background.sprite = _backgroundPool.GetBackgroundSprite(str.TransitionBackground);
-			}
-			else
-			{
-				_pendingAnimations.Enqueue(new AnimGroup()
-					.AddAnimation(new TextAnimation(PhraseText, Time.time, FadeOutDuration, FadeOutCurve, 0.0f))
-					.AddAnimation(new RectAnimation(PhraseBackground.rectTransform, Time.time + FadeOutDuration, TransitionDuration, TransitionCurve, DescriptionBackgroundAnchor.rectTransform))
-					.AddAnimation(new TextAnimation(PhraseText, Time.time + FadeOutDuration + TransitionDuration, FadeInDuration, FadeInCurve, 1.0f, str.TransitionPhrase))
-				);
-			}
+            TransitionToDescription(str);
 		}
 		else
 		{
@@ -208,17 +327,17 @@ public class StoryUIController : MonoBehaviour {
 				{
 					
 					_pendingAnimations.Enqueue(new AnimGroup()
-						.AddAnimation(new TextAnimation(PhraseText, Time.time, FadeOutDuration, FadeOutCurve, 0.0f))
+						.AddAnimation(new FadeAnimation(PhraseText, Time.time, FadeOutDuration, FadeOutCurve, 0.0f))
 						.AddAnimation(new RectAnimation(PhraseBackground.rectTransform, Time.time + FadeOutDuration, TransitionDuration, TransitionCurve, PlayerPhraseBackgroundAnchor.rectTransform))
-						.AddAnimation(new TextAnimation(PhraseText, Time.time + FadeOutDuration + TransitionDuration, FadeInDuration, FadeInCurve, 1.0f, str.TransitionPhrase))
+						.AddAnimation(new FadeAnimation(PhraseText, Time.time + FadeOutDuration + TransitionDuration, FadeInDuration, FadeInCurve, 1.0f))
 					);	
 				}
 				else
 				{
 					_pendingAnimations.Enqueue(new AnimGroup()
-						.AddAnimation(new TextAnimation(PhraseText, Time.time, FadeOutDuration, FadeOutCurve, 0.0f))
+						.AddAnimation(new FadeAnimation(PhraseText, Time.time, FadeOutDuration, FadeOutCurve, 0.0f))
 						.AddAnimation(new RectAnimation(PhraseBackground.rectTransform, Time.time + FadeOutDuration, TransitionDuration, TransitionCurve, NPCPhraseBackgroundAnchor.rectTransform))
-						.AddAnimation(new TextAnimation(PhraseText, Time.time + FadeOutDuration + TransitionDuration, FadeInDuration, FadeInCurve, 1.0f, str.TransitionPhrase))
+						.AddAnimation(new FadeAnimation(PhraseText, Time.time + FadeOutDuration + TransitionDuration, FadeInDuration, FadeInCurve, 1.0f))
 					);
 				}
 			}
@@ -247,14 +366,10 @@ public class StoryUIController : MonoBehaviour {
 			// Play back animations
 			var animGroup = _pendingAnimations.Peek();
 			var t = Time.time;
-			foreach (var textAnim in animGroup.TextAnimations)
+			foreach (var textAnim in animGroup.FadeAnimations)
 			{
 				if (t < textAnim.TimeStart || 
 				    textAnim.DidFinish) continue;
-				if (textAnim.TargetText != null)
-				{
-					textAnim.Target.text = textAnim.TargetText;
-				}
 				var dt = (t - textAnim.TimeStart) / (textAnim.TimeEnd - textAnim.TimeStart);
 				var c = textAnim.Curve.Evaluate(dt);
 				var currentColor = textAnim.Target.color;
@@ -276,6 +391,24 @@ public class StoryUIController : MonoBehaviour {
 				rectAnim.Target.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, transitionSize.y);
 				if (t > rectAnim.TimeEnd) rectAnim.DidFinish = true;
 			}
+
+            foreach(var setText in animGroup.SetTextAnimations)
+            {
+                if (t >= setText.TimeSet && !setText.DidFinish)
+                {
+                    setText.Target.text = setText.TargetText;
+                    setText.DidFinish = true;
+                }
+            }
+
+            foreach(var setSprite in animGroup.SetSpriteAnimations)
+            {
+                if (t >= setSprite.TimeSet && !setSprite.DidFinish)
+                {
+                    setSprite.Target.sprite = setSprite.TargetSprite;
+                    setSprite.DidFinish = true;
+                }
+            }
 
 			if (t > animGroup.TimeEnd)
 			{
