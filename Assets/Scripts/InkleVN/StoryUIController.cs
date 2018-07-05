@@ -329,7 +329,7 @@ public class StoryUIController : MonoBehaviour {
     private void TransitionBackground(SceneTransitionRequest str)
     {
         var animGroup = new AnimGroup();
-        BackgroundTransition.sprite = _backgroundPool.GetBackgroundSprite(str.TransitionBackground);
+        BackgroundTransition.sprite = _backgroundPool.GetBackgroundSprite(str.TransitionBackground.ToLower());
         animGroup.AddAnimation(new FadeAnimation(BackgroundTransition, Time.time, FadeInDuration, FadeInCurve, 1.0f))
             .AddAnimation(new SetSpriteAnimation(Background, Time.time + FadeInDuration, BackgroundTransition.sprite))
             .AddAnimation(new FadeAnimation(BackgroundTransition, Time.time + FadeInDuration, 0.001f, FadeOutCurve, 0.0f));

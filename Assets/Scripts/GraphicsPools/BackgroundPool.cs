@@ -29,7 +29,7 @@ namespace GraphicsPools
             _backgroundResources = new Dictionary<string, string>();
             foreach (var bg in backgroundList)
             {
-                _backgroundResources[bg.name] = bg.image;
+                _backgroundResources[bg.name.ToLower()] = bg.image;
             }
 
             _backgroundPool = new Dictionary<string, Sprite>();
