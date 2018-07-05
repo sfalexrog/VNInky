@@ -177,7 +177,7 @@ public class StoryPlayer : MonoBehaviour
     private string RebuildString(string[] splitString, int offset)
     {
         StringBuilder sb = new StringBuilder();
-        for(int i = 0; i < splitString.Length; ++i)
+        for(int i = offset; i < splitString.Length; ++i)
         {
             sb.Append(splitString[i]);
             if (i < splitString.Length - 1)

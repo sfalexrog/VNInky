@@ -45,6 +45,9 @@ public class StoryUIController : MonoBehaviour {
 
     private Text _shadowText;
 
+    // Actor image and name canvas group (used to show/hide both actor image and actor name box)
+    private CanvasGroup _actorGroup;
+
     public void SetOnChoiceHandler(OnChoice handler)
     {
         _choiceHandler = handler;
@@ -157,6 +160,38 @@ public class StoryUIController : MonoBehaviour {
         }
     }
 
+    // Animation to fade in/out a canvas group
+    private class FadeCGAnimation
+    {
+        public float TimeStart;
+        public float TimeEnd;
+
+        public AnimationCurve Curve;
+        public CanvasGroup Target;
+
+        // Opacity values for text (since we're only doing that)
+        public float InitialAlpha;
+        public float TargetAlpha;
+
+        public bool DidFinish;
+
+        // Convenience constructor
+        public FadeCGAnimation(CanvasGroup target, float timeStart, float duration, AnimationCurve curve,
+            float targetAlpha)
+        {
+            Target = target;
+            TimeStart = timeStart;
+            TimeEnd = timeStart + duration;
+            Curve = curve;
+            //InitialAlpha = target.color.a;
+            // hack: initial alpha is always 1-targetAlpha
+            InitialAlpha = 1.0f - targetAlpha;
+            TargetAlpha = targetAlpha;
+            DidFinish = TimeEnd < TimeStart;
+        }
+    }
+
+
 
     // Animation group: animations that should be played simultaneously.
     // Only one animation group will be played at a time.
@@ -171,6 +206,7 @@ public class StoryUIController : MonoBehaviour {
         public List<FadeAnimation> FadeAnimations;
         public List<SetTextAnimation> SetTextAnimations;
         public List<SetSpriteAnimation> SetSpriteAnimations;
+        public List<FadeCGAnimation> FadeCGAnimations;
 
         public AnimGroup()
         {
@@ -179,6 +215,7 @@ public class StoryUIController : MonoBehaviour {
             FadeAnimations = new List<FadeAnimation>();
             SetTextAnimations = new List<SetTextAnimation>();
             SetSpriteAnimations = new List<SetSpriteAnimation>();
+            FadeCGAnimations = new List<FadeCGAnimation>();
         }
 
         public AnimGroup AddAnimation(RectAnimation ra)
@@ -212,6 +249,14 @@ public class StoryUIController : MonoBehaviour {
             SetSpriteAnimations.Add(ssa);
             return this;
         }
+
+        public AnimGroup AddAnimation(FadeCGAnimation fcga)
+        {
+            TimeStart = Mathf.Min(TimeStart, fcga.TimeStart);
+            TimeEnd = Mathf.Max(TimeEnd, fcga.TimeEnd);
+            FadeCGAnimations.Add(fcga);
+            return this;
+        }
     }
 
     private Queue<AnimGroup> _pendingAnimations;
@@ -222,6 +267,7 @@ public class StoryUIController : MonoBehaviour {
         _actorPool = new ActorPool(false);
         _backgroundPool = new BackgroundPool(false);
         _pendingAnimations = new Queue<AnimGroup>();
+        _actorGroup = ActorImage.GetComponent<CanvasGroup>();
     }
 
     /**
@@ -258,7 +304,26 @@ public class StoryUIController : MonoBehaviour {
         _shadowText.rectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, requestedSize.y);
 
         _shadowText.text = textContents;
+        _shadowText.rectTransform.ForceUpdateRectTransforms();
         return LayoutUtility.GetPreferredHeight(_shadowText.rectTransform);
+    }
+
+    // Animate actor group hiding
+    private void HideActor()
+    {
+        // Account for floats being floats
+        if (_actorGroup.alpha < 0.001f) return;
+        var animGroup = new AnimGroup();
+        animGroup.AddAnimation(new FadeCGAnimation(_actorGroup, Time.time, FadeOutDuration, FadeOutCurve, 0.0f));
+        _pendingAnimations.Enqueue(animGroup);
+    }
+
+    private void ShowActor()
+    {
+        if (_actorGroup.alpha > 0.99f) return;
+        var animGroup = new AnimGroup();
+        animGroup.AddAnimation(new FadeCGAnimation(_actorGroup, Time.time, FadeInDuration, FadeInCurve, 1.0f));
+        _pendingAnimations.Enqueue(animGroup);
     }
 
     private void TransitionBackground(SceneTransitionRequest str)
@@ -271,7 +336,7 @@ public class StoryUIController : MonoBehaviour {
         _pendingAnimations.Enqueue(animGroup);
     }
 
-    private void TransitionToDescription(SceneTransitionRequest str)
+    private void TransitionMainText(SceneTransitionRequest str, Image anchorTarget)
     {
         var animGroup = new AnimGroup();
         var textFadeOut = new FadeAnimation(PhraseText, Time.time, FadeOutDuration, FadeOutCurve, 0.0f);
@@ -279,15 +344,15 @@ public class StoryUIController : MonoBehaviour {
 
         var lastAnimFinish = textFadeOut.TimeEnd;
 
-        var defaultTextBoxSize = new Vector2(DescriptionBackgroundAnchor.rectTransform.rect.width - 30,
-                                            DescriptionBackgroundAnchor.rectTransform.rect.height - 30);
+        var defaultTextBoxSize = new Vector2(anchorTarget.rectTransform.rect.width - 30,
+                                            anchorTarget.rectTransform.rect.height - 30);
 
         var requiredHeight = GetDesiredTextHeight(PhraseText, str.TransitionPhrase, defaultTextBoxSize);
 
-        if (PhraseBackground.rectTransform.anchoredPosition != DescriptionBackgroundAnchor.rectTransform.anchoredPosition ||
+        if (PhraseBackground.rectTransform.anchoredPosition != anchorTarget.rectTransform.anchoredPosition ||
             requiredHeight != PhraseText.rectTransform.rect.height)
         {
-            var textBoxResize = new RectAnimation(PhraseBackground.rectTransform, textFadeOut.TimeEnd, TransitionDuration, TransitionCurve, DescriptionBackgroundAnchor.rectTransform);
+            var textBoxResize = new RectAnimation(PhraseBackground.rectTransform, textFadeOut.TimeEnd, TransitionDuration, TransitionCurve, anchorTarget.rectTransform);
             // Fixup for correct size
             textBoxResize.TargetSize.y = requiredHeight + 30;
             animGroup.AddAnimation(textBoxResize);
@@ -316,39 +381,27 @@ public class StoryUIController : MonoBehaviour {
         }
         if (str.TransitionSpeaker == null)
 		{
-            TransitionToDescription(str);
+            HideActor();
+            TransitionMainText(str, DescriptionBackgroundAnchor);
 		}
 		else
 		{
+            ShowActor();
 			ActorImage.sprite = _actorPool.GetActorSprite(str.TransitionSpeaker, str.TransitionSpeakerEmotion);
 			if (str.TransitionChoices == null)
 			{
 				if (str.TransitionSpeaker.Contains("Player"))
 				{
-					
-					_pendingAnimations.Enqueue(new AnimGroup()
-						.AddAnimation(new FadeAnimation(PhraseText, Time.time, FadeOutDuration, FadeOutCurve, 0.0f))
-						.AddAnimation(new RectAnimation(PhraseBackground.rectTransform, Time.time + FadeOutDuration, TransitionDuration, TransitionCurve, PlayerPhraseBackgroundAnchor.rectTransform))
-						.AddAnimation(new FadeAnimation(PhraseText, Time.time + FadeOutDuration + TransitionDuration, FadeInDuration, FadeInCurve, 1.0f))
-					);	
+                    TransitionMainText(str, PlayerPhraseBackgroundAnchor);
 				}
 				else
 				{
-					_pendingAnimations.Enqueue(new AnimGroup()
-						.AddAnimation(new FadeAnimation(PhraseText, Time.time, FadeOutDuration, FadeOutCurve, 0.0f))
-						.AddAnimation(new RectAnimation(PhraseBackground.rectTransform, Time.time + FadeOutDuration, TransitionDuration, TransitionCurve, NPCPhraseBackgroundAnchor.rectTransform))
-						.AddAnimation(new FadeAnimation(PhraseText, Time.time + FadeOutDuration + TransitionDuration, FadeInDuration, FadeInCurve, 1.0f))
-					);
+                    TransitionMainText(str, NPCPhraseBackgroundAnchor);
 				}
 			}
 		}
 
 		return true;
-	}
-
-	private void GetPhraseSize(string text)
-	{
-		
 	}
 	
 	// Use this for initialization
@@ -378,7 +431,17 @@ public class StoryUIController : MonoBehaviour {
 				if (t > textAnim.TimeEnd) textAnim.DidFinish = true;
 			}
 
-			foreach (var rectAnim in animGroup.RectAnimations)
+            foreach (var cgAnim in animGroup.FadeCGAnimations)
+            {
+                if (t < cgAnim.TimeStart ||
+                    cgAnim.DidFinish) continue;
+                var dt = (t - cgAnim.TimeStart) / (cgAnim.TimeEnd - cgAnim.TimeStart);
+                var c = cgAnim.Curve.Evaluate(dt);
+                cgAnim.Target.alpha = c * cgAnim.TargetAlpha + (1 - c) * cgAnim.InitialAlpha;
+                if (t > cgAnim.TimeEnd) cgAnim.DidFinish = true;
+            }
+
+            foreach (var rectAnim in animGroup.RectAnimations)
 			{
 				if (t < rectAnim.TimeStart ||
 				    rectAnim.DidFinish) continue;
