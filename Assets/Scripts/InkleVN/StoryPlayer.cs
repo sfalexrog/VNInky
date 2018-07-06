@@ -170,6 +170,7 @@ public class StoryPlayer : MonoBehaviour
 
 	private void OnChoice(int choice)
 	{
+        if (!UI.WillAcceptTransitions) return;
 		_story.ChooseChoiceIndex(choice);
 		OnProceed();
 	}
@@ -193,7 +194,6 @@ public class StoryPlayer : MonoBehaviour
      */
     private SceneTransitionRequest CreateSceneTransition(SceneTransitionRequest prevRequest = null)
     {
-        if (!_story.canContinue) return null;
         var transitionBuilder = new SceneTransitionRequest.Builder();
         if (prevRequest != null)
         {
@@ -246,25 +246,25 @@ public class StoryPlayer : MonoBehaviour
                 {
                     var speaker = GetGender() == 0 ? _playerBoyName : _playerGirlName;
                     transitionBuilder.SetSpeaker(speaker, actorEmotion);
-                    transitionBuilder.SetPhrase(RebuildString(splitText, 1));
+                    transitionBuilder.SetPhrase(RebuildString(splitText, 1).Trim());
                 }
                 else if (_registeredActors.Contains(splitText[0]))
                 {
                     var speaker = splitText[0];
                     transitionBuilder.SetSpeaker(speaker, actorEmotion);
-                    transitionBuilder.SetPhrase(RebuildString(splitText, 1));
+                    transitionBuilder.SetPhrase(RebuildString(splitText, 1).Trim());
                 }
                 else
                 {
                     // No one is actually speaking, the colon is just part of the text
-                    transitionBuilder.SetPhrase(storyText);
+                    transitionBuilder.SetPhrase(storyText.Trim());
                 }
             }
         }
         else
         {
             // Set text only
-            transitionBuilder.SetPhrase(storyText);
+            transitionBuilder.SetPhrase(storyText.Trim());
         }
 
         // Parse choices (if there are any)
@@ -290,7 +290,6 @@ public class StoryPlayer : MonoBehaviour
 		{
 			var nextStoryText = _story.Continue();
             var transition = CreateSceneTransition();
-			var parsedText = ParsePhrase(nextStoryText, _story.currentTags);
             UI.Transition(transition);
 		}
 		else

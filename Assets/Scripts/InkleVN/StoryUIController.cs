@@ -23,6 +23,11 @@ public class StoryUIController : MonoBehaviour {
 
     public Button TapTarget;
 
+    [Header("UI prototype elements")]
+
+    public Image UIContainer;
+    public Button ChoiceButtonPrototype;
+
     [Header("Animation controls")]
     public float FadeOutDuration;
     public AnimationCurve FadeOutCurve;
@@ -39,11 +44,20 @@ public class StoryUIController : MonoBehaviour {
     public Image DescriptionBackgroundAnchor;
     public Image NPCPhraseBackgroundAnchor;
 
+    public Image ChoiceBackgroundAnchor;
+
+    [Header("Choice colors")]
+    public Color GoodChoice;
+    public Color NeutralChoice;
+    public Color BadChoice;
+
     public delegate void OnChoice(int choiceIndex);
 
     private OnChoice _choiceHandler;
 
     private Text _shadowText;
+
+    private Button[] _choiceButtons;
 
     // Actor image and name canvas group (used to show/hide both actor image and actor name box)
     private CanvasGroup _actorGroup;
@@ -318,12 +332,28 @@ public class StoryUIController : MonoBehaviour {
         _pendingAnimations.Enqueue(animGroup);
     }
 
-    private void ShowActor()
+    private void ShowActor(SceneTransitionRequest str)
     {
-        if (_actorGroup.alpha > 0.99f) return;
-        var animGroup = new AnimGroup();
-        animGroup.AddAnimation(new FadeCGAnimation(_actorGroup, Time.time, FadeInDuration, FadeInCurve, 1.0f));
-        _pendingAnimations.Enqueue(animGroup);
+        var timeOffset = 0.0f;
+        // If the actor name is already on screen, change it gracefully
+        if (_actorGroup.alpha > 0.99f)
+        {
+            if (ActorName.text != str.TransitionSpeaker)
+            {
+                var animGroup = new AnimGroup();
+                animGroup.AddAnimation(new FadeAnimation(ActorName, Time.time, FadeOutDuration, FadeOutCurve, 0.0f))
+                    .AddAnimation(new SetTextAnimation(ActorName, Time.time + FadeOutDuration, str.TransitionSpeaker))
+                    .AddAnimation(new FadeAnimation(ActorName, Time.time + FadeOutDuration, FadeInDuration, FadeInCurve, 1.0f));
+                timeOffset = FadeOutDuration + FadeInDuration;
+                _pendingAnimations.Enqueue(animGroup);
+            }
+        }
+        else
+        {
+            // Change the name without any animation, the fade in from the canvas group will do the rest
+            ActorName.text = str.TransitionSpeaker;
+            _pendingAnimations.Enqueue(new AnimGroup().AddAnimation(new FadeCGAnimation(_actorGroup, Time.time + timeOffset, FadeInDuration, FadeInCurve, 1.0f)));
+        }
     }
 
     private void TransitionBackground(SceneTransitionRequest str)
@@ -345,16 +375,16 @@ public class StoryUIController : MonoBehaviour {
         var lastAnimFinish = textFadeOut.TimeEnd;
 
         var defaultTextBoxSize = new Vector2(anchorTarget.rectTransform.rect.width - 30,
-                                            anchorTarget.rectTransform.rect.height - 30);
+                                            anchorTarget.rectTransform.rect.height - 35);
 
         var requiredHeight = GetDesiredTextHeight(PhraseText, str.TransitionPhrase, defaultTextBoxSize);
 
         if (PhraseBackground.rectTransform.anchoredPosition != anchorTarget.rectTransform.anchoredPosition ||
-            requiredHeight != PhraseText.rectTransform.rect.height)
+            !Mathf.Approximately(requiredHeight, PhraseText.rectTransform.rect.height))
         {
             var textBoxResize = new RectAnimation(PhraseBackground.rectTransform, textFadeOut.TimeEnd, TransitionDuration, TransitionCurve, anchorTarget.rectTransform);
             // Fixup for correct size
-            textBoxResize.TargetSize.y = requiredHeight + 30;
+            textBoxResize.TargetSize.y = requiredHeight + 35;
             animGroup.AddAnimation(textBoxResize);
             lastAnimFinish = textBoxResize.TimeEnd;
         }
@@ -366,7 +396,52 @@ public class StoryUIController : MonoBehaviour {
         _pendingAnimations.Enqueue(animGroup);
     }
 
+    private void CreateChoices(SceneTransitionRequest str)
+    {
+        var animGroup = new AnimGroup();
+        var curTime = Time.time;
+        if (_choiceButtons != null)
+        {
+            foreach(var btn in _choiceButtons)
+            {
+                Destroy(btn);
+            }
+        }
+        _choiceButtons = new Button[str.TransitionChoices.Length];
+        for(int i = 0; i < str.TransitionChoices.Length; ++i)
+        {
+            var choiceButton = Instantiate<Button>(ChoiceButtonPrototype, UIContainer.transform);
+            var choice = str.TransitionChoices[i];
+            choiceButton.gameObject.SetActive(true);
 
+            var choiceButtonCG = choiceButton.GetComponent<CanvasGroup>();
+            choiceButtonCG.alpha = 0.0f;
+            animGroup.AddAnimation(new FadeCGAnimation(choiceButtonCG, curTime + i * FadeInDuration, FadeInDuration, FadeInCurve, 1.0f));
+
+            choiceButton.image.rectTransform.anchoredPosition = ChoiceButtonPrototype.image.rectTransform.anchoredPosition + new Vector2(0.0f, -i * (ChoiceButtonPrototype.image.rectTransform.rect.height + 40));
+
+            choiceButton.onClick.AddListener(delegate { _choiceHandler(choice.ChoiceID); });
+
+            var choiceButtonText = choiceButton.GetComponentInChildren<Text>();
+            choiceButtonText.text = choice.ChoiceText;
+
+            _choiceButtons[i] = choiceButton;
+        }
+        _pendingAnimations.Enqueue(animGroup);
+    }
+
+    private void HideChoices()
+    {
+        if (_choiceButtons != null)
+        {
+            foreach(var btn in _choiceButtons)
+            {
+                btn.gameObject.SetActive(false);
+                Destroy(btn);
+            }
+            _choiceButtons = null;
+        }
+    }
     
 	
 	/**
@@ -374,6 +449,7 @@ public class StoryUIController : MonoBehaviour {
 	 */
 	public bool Transition(SceneTransitionRequest str)
 	{
+        HideChoices();
 		if (!_willAcceptTransitions) return false;
         if (str.TransitionBackground != null)
         {
@@ -386,12 +462,15 @@ public class StoryUIController : MonoBehaviour {
 		}
 		else
 		{
-            ShowActor();
+            ShowActor(str);
 			ActorImage.sprite = _actorPool.GetActorSprite(str.TransitionSpeaker, str.TransitionSpeakerEmotion);
 			if (str.TransitionChoices == null)
 			{
+                // Enable generic tap target if there are no choices
+                TapTarget.gameObject.SetActive(true);
 				if (str.TransitionSpeaker.Contains("Player"))
 				{
+                    
                     TransitionMainText(str, PlayerPhraseBackgroundAnchor);
 				}
 				else
@@ -399,6 +478,13 @@ public class StoryUIController : MonoBehaviour {
                     TransitionMainText(str, NPCPhraseBackgroundAnchor);
 				}
 			}
+            else
+            {
+                // Disable generic tap target
+                TapTarget.gameObject.SetActive(false);
+                TransitionMainText(str, ChoiceBackgroundAnchor);
+                CreateChoices(str);
+            }
 		}
 
 		return true;
